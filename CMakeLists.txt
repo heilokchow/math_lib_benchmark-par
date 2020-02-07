@@ -17,6 +17,10 @@ target_compile_options(benchmark
 	PUBLIC -mfma
 )
 
+target_include_directories(benchmark
+	PUBLIC "${CMAKE_CURRENT_BINARY_DIR}"
+)
+
 target_link_libraries(benchmark
 	PUBLIC Eigen3::Eigen
 	PUBLIC OpenBLAS::OpenBLAS

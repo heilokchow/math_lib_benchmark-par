@@ -4,6 +4,7 @@
 #include <random>
 #include <string>
 #include <fstream>
+#include <memory>
 #include <Eigen/Dense>
 #include <cblas.h>
 #include <lapacke.h>
@@ -16,16 +17,8 @@
 #define CHECK 0
 #endif 
 
-#ifndef MODEL
-#define MODE 1
-#else
-#define MODE 0
-#endif
-
-#if MODE == 1
 #define EIGEN_NO_DEBUG
 #define EIGEN_DONT_PARALLELIZE
-#endif
 
 void F_GEMM(double* const&, double* const&, double* const&, const int&, const int&, const int&);
 void F_GESV(double* const&, double* const&, double* const&, const int&, const int&, const int&);
@@ -39,45 +32,98 @@ int main(int argc, char** argv)
         puts("./a.out <dim> <nrep>");
         exit(0);
     }
-
+  
     int n = std::stoi(argv[1]);
     int nrep = std::stoi(argv[2]);
 
-    double* x = new double[n*n];
-    double* y = new double[n*n];
-    double* z = new double[n*n];
-    double* v = new double[n];
-    double* b = new double[n];
-    int p = 0;
-    for (size_t i = 0; i < n; i++) {
-        for (size_t j = 0; j < n; j++) {
-            p = i * n + j;
-            x[p] = 0.0;
-            y[p] = 0.0;
-            z[p] = 0.0;
-        }
-        v[i] = 0;
-        b[i] = 0;
-    }   
-
-    if (CHECK == 1) {
-        check(n);
-    }
+    double t_eigen = 0;
+    double t_openblas = 0; 
+    double start_eigen, end_eigen;
+    double start_openblas, end_openblas;
 
     // Perform Martix Multiplication
-    F_GEMM(x, y, z, n, nrep, MODE);
+    
+    start_eigen = omp_get_wtime();
+    #pragma omp parallel for schedule(dynamic)
+    for (int i = 0; i < nrep; i++) {
 
-    // Perform Matrix Inversion
-    F_GESV(v, y, b, n, nrep, MODE);
+        double* x = new double[n*n];
+        double* y = new double[n*n];
+        double* z = new double[n*n];
+        int p = 0;
+        
+        int id = omp_get_thread_num();
+        printf("ID: %d, #Eigen Matrix Multiplication\n", id);
 
-    // Perform Cholesky Decomposition
-    F_POTRF(y, n, nrep, MODE);
+        std::random_device device;
+        std::mt19937 generator(device());
+        std::normal_distribution<double> normal(0.0, 1.0);
 
-    delete[] x;
-    delete[] y;
-    delete[] z;
-    delete[] v;
-    delete[] b;
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                p = i * n + j;
+                y[p] = normal(generator);
+                z[p] = normal(generator);
+            }
+        }
+
+        Eigen::MatrixXd C = Eigen::MatrixXd::Zero(n, n);
+        Eigen::Map<Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, 1>>
+            X(&y[0], n, n, Eigen::Stride<Eigen::Dynamic, 1>(n, 1));
+        Eigen::Map<Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, 1>>
+            Y(&y[0], n, n, Eigen::Stride<Eigen::Dynamic, 1>(n, 1));
+
+        C.noalias() = X * Y;
+
+        delete[] x;
+        delete[] y;
+        delete[] z;
+    }
+    end_eigen = omp_get_wtime();
+
+    start_openblas = omp_get_wtime();
+    #pragma omp parallel for schedule(dynamic)
+    for (int i = 0; i < nrep; i++) {
+        double* x = new double[n*n];
+        double* y = new double[n*n];
+        double* z = new double[n*n];
+        int p = 0;
+
+        std::random_device device;
+        std::mt19937 generator(device());
+        std::normal_distribution<double> normal(0.0, 1.0);
+
+        int id = omp_get_thread_num();
+        printf("ID: %d, #OpenBLAS Matrix Multiplication\n", id);
+
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                p = i * n + j;
+                y[p] = normal(generator);
+                z[p] = normal(generator);
+            }
+        }
+
+        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                    n, n, n, 1.0, y, n, z, n, 0.0, x, n);
+
+        delete[] x;
+        delete[] y;
+        delete[] z;
+    }
+    end_openblas = omp_get_wtime();
+
+    printf("Eigen DGEMM average time: %f\n", (end_eigen - start_eigen)/nrep);
+    printf("OpenBLAS DGEMM average time: %f\n", (end_openblas - start_openblas)/nrep);
+
+    // F_GEMM(x, y, z, n, nrep, mode);
+
+    // // Perform Matrix Inversion
+    // F_GESV(v, y, b, n, nrep, mode);
+
+    // // Perform Cholesky Decomposition
+    // F_POTRF(y, n, nrep, mode);
+
     return 0;
 }
 
@@ -92,7 +138,7 @@ void F_GEMM(double* const& x, double* const& y, double* const& z, const int& n, 
     std::mt19937 generator(device());
     std::normal_distribution<double> normal(0.0, 1.0);
 
-    #pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < nrep; i++)
     {
         for (size_t i = 0; i < n; i++) {
@@ -127,7 +173,7 @@ void F_GEMM(double* const& x, double* const& y, double* const& z, const int& n, 
         t += static_cast<double>(elapsed.count());
     }
     std::cout << "DGEMM average time: " << t / nrep << "s\n";
-    ot << "DGEMM," << MODE << "," << n << "," << t / nrep << "\n";
+    ot << "DGEMM," << mode << "," << n << "," << t / nrep << "\n";
     ot.close();
 }
 
@@ -145,7 +191,7 @@ void F_GESV(double* const& v, double* const& y, double* const& b, const int& n, 
     std::mt19937 generator(device());
     std::normal_distribution<double> normal(0.0, 1.0);
 
-    #pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < nrep; i++)
     {
         for (size_t i = 0; i < n; i++) {
@@ -172,7 +218,7 @@ void F_GESV(double* const& v, double* const& y, double* const& b, const int& n, 
                 C(i) = 0;
             }
             t0 = std::chrono::system_clock::now();
-            C = X.llt().solve(Y);
+            C.noalias() = X.llt().solve(Y);
             t1 = std::chrono::system_clock::now();
         }
         else {
@@ -187,7 +233,7 @@ void F_GESV(double* const& v, double* const& y, double* const& b, const int& n, 
         t += static_cast<double>(elapsed.count());
     }
     std::cout << "DGESV average time: " << t / nrep << "s\n";
-    ot << "DGESV," << MODE << "," << n << "," << t / nrep << "\n";
+    ot << "DGESV," << mode << "," << n << "," << t / nrep << "\n";
     ot.close();
     delete[] y1;
     delete[] y2;
@@ -207,7 +253,7 @@ void F_POTRF(double* const& y, const int& n, const int& nrep, const int& mode) {
     std::mt19937 generator(device());
     std::normal_distribution<double> normal(0.0, 1.0);
 
-    #pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < nrep; i++)
     {
         for (size_t i = 0; i < n; i++) {
@@ -245,7 +291,7 @@ void F_POTRF(double* const& y, const int& n, const int& nrep, const int& mode) {
         t += static_cast<double>(elapsed.count());
     }
     std::cout << "DPOTRF average time: " << t / nrep << "s\n";
-    ot << "DPOTRF," << MODE << "," << n << "," << t / nrep << "\n";
+    ot << "DPOTRF," << mode << "," << n << "," << t / nrep << "\n";
     ot.close();
     delete[] y1;
     delete[] y2;
