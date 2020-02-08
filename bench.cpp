@@ -46,19 +46,21 @@ int main(int argc, char** argv)
         std::mt19937 generator(device());
         std::normal_distribution<double> normal(0.0, 1.0);
 
-        for (int i = 0; i < n*n; i++) {
+        for (int i = 0; i < n*n; i++)
             y[i] = normal(generator);
-            z[i] = normal(generator);
-        }
 
-        Eigen::MatrixXd C = Eigen::MatrixXd::Zero(n, n);
+        for (int i = 0; i < n*n; i++)
+            z[i] = normal(generator);
+
         Eigen::Map<Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, 1>>
-            X(&y[0], n, n, Eigen::Stride<Eigen::Dynamic, 1>(n, 1));
+            X(&x[0], n, n, Eigen::Stride<Eigen::Dynamic, 1>(n, 1));
         Eigen::Map<Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, 1>>
             Y(&y[0], n, n, Eigen::Stride<Eigen::Dynamic, 1>(n, 1));
+        Eigen::Map<Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, 1>>
+            Z(&z[0], n, n, Eigen::Stride<Eigen::Dynamic, 1>(n, 1));
 
         start_eigen = omp_get_wtime();
-        C.noalias() = X * Y;
+        X.noalias() = Y * Z;
         end_eigen = omp_get_wtime();
 
         #pragma omp critical
@@ -82,10 +84,12 @@ int main(int argc, char** argv)
         int id = omp_get_thread_num();
         printf("ID: %d, #OpenBLAS Matrix Multiplication\n", id);
 
-        for (int i = 0; i < n*n; i++) {
+        for (int i = 0; i < n*n; i++) 
             y[i] = normal(generator);
+
+        for (int i = 0; i < n*n; i++)
             z[i] = normal(generator);
-        }
+
 
         start_openblas = omp_get_wtime();
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, y, n, z, n, 0.0, x, n);
@@ -122,15 +126,11 @@ int main(int argc, char** argv)
         std::mt19937 generator(device());
         std::normal_distribution<double> normal(0.0, 1.0);
 
-        for (int i = 0; i < n*n; i++) {
+        for (int i = 0; i < n*n; i++)
             y[i] = normal(generator);
-            yy[i] = 0;
-        }
 
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < n; i++)
             b[i] = normal(generator);
-            x[i] = 0.0;
-        }
 
         Eigen::Map<Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, 1>>
             Y(&y[0], n, n, Eigen::Stride<Eigen::Dynamic, 1>(n, 1));
@@ -171,15 +171,11 @@ int main(int argc, char** argv)
         std::mt19937 generator(device());
         std::normal_distribution<double> normal(0.0, 1.0);
 
-        for (int i = 0; i < n*n; i++) {
+        for (int i = 0; i < n*n; i++)
             y[i] = normal(generator);
-            yy[i] = 0;
-        }
 
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < n; i++)
             b[i] = normal(generator);
-            x[i] = 0.0;
-        }
 
         Eigen::Map<Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, 1>>
             Y(&y[0], n, n, Eigen::Stride<Eigen::Dynamic, 1>(n, 1));
