@@ -38,7 +38,6 @@ int main(int argc, char** argv)
         double* x = new double[n*n];
         double* y = new double[n*n];
         double* z = new double[n*n];
-        int p = 0;
         
         int id = omp_get_thread_num();
         printf("ID: %d, #Eigen Matrix Multiplication\n", id);
@@ -47,12 +46,9 @@ int main(int argc, char** argv)
         std::mt19937 generator(device());
         std::normal_distribution<double> normal(0.0, 1.0);
 
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n; j++) {
-                p = i * n + j;
-                y[p] = normal(generator);
-                z[p] = normal(generator);
-            }
+        for (int i = 0; i < n*n; i++) {
+            y[i] = normal(generator);
+            z[i] = normal(generator);
         }
 
         Eigen::MatrixXd C = Eigen::MatrixXd::Zero(n, n);
@@ -78,7 +74,6 @@ int main(int argc, char** argv)
         double* x = new double[n*n];
         double* y = new double[n*n];
         double* z = new double[n*n];
-        int p = 0;
 
         std::random_device device;
         std::mt19937 generator(device());
@@ -87,12 +82,9 @@ int main(int argc, char** argv)
         int id = omp_get_thread_num();
         printf("ID: %d, #OpenBLAS Matrix Multiplication\n", id);
 
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n; j++) {
-                p = i * n + j;
-                y[p] = normal(generator);
-                z[p] = normal(generator);
-            }
+        for (int i = 0; i < n*n; i++) {
+            y[i] = normal(generator);
+            z[i] = normal(generator);
         }
 
         start_openblas = omp_get_wtime();
@@ -123,8 +115,6 @@ int main(int argc, char** argv)
         double* b = new double[n];
         double* x = new double[n];
 
-        int p = 0;
-        
         int id = omp_get_thread_num();
         printf("ID: %d, #Eigen Linear Solver\n", id);
 
@@ -132,12 +122,12 @@ int main(int argc, char** argv)
         std::mt19937 generator(device());
         std::normal_distribution<double> normal(0.0, 1.0);
 
+        for (int i = 0; i < n*n; i++) {
+            y[i] = normal(generator);
+            yy[i] = 0;
+        }
+
         for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n; j++) {
-                p = i * n + j;
-                y[p] = normal(generator);
-                yy[p] = 0.0;
-            }
             b[i] = normal(generator);
             x[i] = 0.0;
         }
@@ -173,9 +163,7 @@ int main(int argc, char** argv)
         double* b = new double[n];
         double* x = new double[n];
         int* ipiv = new int[n];
-
-        int p = 0;
-        
+ 
         int id = omp_get_thread_num();
         printf("ID: %d, #OpenBLAS Linear Solver\n", id);
 
@@ -183,12 +171,12 @@ int main(int argc, char** argv)
         std::mt19937 generator(device());
         std::normal_distribution<double> normal(0.0, 1.0);
 
+        for (int i = 0; i < n*n; i++) {
+            y[i] = normal(generator);
+            yy[i] = 0;
+        }
+
         for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n; j++) {
-                p = i * n + j;
-                y[p] = normal(generator);
-                yy[p] = 0.0;
-            }
             b[i] = normal(generator);
             x[i] = 0.0;
         }
