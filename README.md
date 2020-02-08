@@ -6,4 +6,4 @@ parallel version of math_lib_benchmark
 
 'AVG' is the averaged actual time takes for the whole binary to run for a single replication. Other four categories are the averaged time elapsed for a single replication for each thread.
 
-![Imgur](https://i.imgur.com/EINtqaH.jpg)
+![Imgur](https://imgur.com/SDHJCzD.jpeg)
