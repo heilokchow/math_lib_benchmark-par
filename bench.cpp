@@ -11,19 +11,8 @@
 #include <omp.h>
 #include "benchConfig.h"
 
-#define USE_OPENMP 1
-// #define CHECK 1
-#ifndef CHECK
-#define CHECK 0
-#endif 
-
 #define EIGEN_NO_DEBUG
 #define EIGEN_DONT_PARALLELIZE
-
-void F_GEMM(double* const&, double* const&, double* const&, const int&, const int&, const int&);
-void F_GESV(double* const&, double* const&, double* const&, const int&, const int&, const int&);
-void F_POTRF(double* const&, const int&, const int&, const int&);
-void check(const int&);
 
 int main(int argc, char** argv)
 {
@@ -43,8 +32,7 @@ int main(int argc, char** argv)
 
     // Perform Martix Multiplication
     
-    start_eigen = omp_get_wtime();
-    #pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(dynamic) firstprivate(start_eigen, end_eigen)
     for (int i = 0; i < nrep; i++) {
 
         double* x = new double[n*n];
@@ -73,16 +61,19 @@ int main(int argc, char** argv)
         Eigen::Map<Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, 1>>
             Y(&y[0], n, n, Eigen::Stride<Eigen::Dynamic, 1>(n, 1));
 
+        start_eigen = omp_get_wtime();
         C.noalias() = X * Y;
+        end_eigen = omp_get_wtime();
+
+        #pragma omp critical
+        t_eigen += end_eigen - start_eigen;
 
         delete[] x;
         delete[] y;
         delete[] z;
     }
-    end_eigen = omp_get_wtime();
 
-    start_openblas = omp_get_wtime();
-    #pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(dynamic) firstprivate(start_openblas, end_openblas)
     for (int i = 0; i < nrep; i++) {
         double* x = new double[n*n];
         double* y = new double[n*n];
@@ -104,286 +95,130 @@ int main(int argc, char** argv)
             }
         }
 
-        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-                    n, n, n, 1.0, y, n, z, n, 0.0, x, n);
+        start_openblas = omp_get_wtime();
+        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, y, n, z, n, 0.0, x, n);
+        end_openblas = omp_get_wtime();
+
+        #pragma omp critical
+        t_openblas += end_openblas - start_openblas;
 
         delete[] x;
         delete[] y;
         delete[] z;
     }
-    end_openblas = omp_get_wtime();
 
-    printf("Eigen DGEMM average time: %f\n", (end_eigen - start_eigen)/nrep);
-    printf("OpenBLAS DGEMM average time: %f\n", (end_openblas - start_openblas)/nrep);
+    printf("Eigen DGEMM average time: %f\n", t_eigen/nrep);
+    printf("OpenBLAS DGEMM average time: %f\n", t_openblas/nrep);
 
-    // F_GEMM(x, y, z, n, nrep, mode);
+    // Perform Matrix Inversion
+    
+    t_eigen = 0;
+    t_openblas = 0;
 
-    // // Perform Matrix Inversion
-    // F_GESV(v, y, b, n, nrep, mode);
+    #pragma omp parallel for schedule(dynamic) firstprivate(start_eigen, end_eigen)
+    for (int i = 0; i < nrep; i++) {
 
-    // // Perform Cholesky Decomposition
-    // F_POTRF(y, n, nrep, mode);
+        double* yy = new double[n*n];
+        double* y = new double[n*n];
+        double* b = new double[n];
+        double* x = new double[n];
 
-    return 0;
-}
+        int p = 0;
+        
+        int id = omp_get_thread_num();
+        printf("ID: %d, #Eigen Linear Solver\n", id);
 
-void F_GEMM(double* const& x, double* const& y, double* const& z, const int& n, const int& nrep, const int& mode) {
-    std::ofstream ot;
-    ot.open("result.txt", std::ios_base::app);
-    double t = 0.0;
-    int p = 0;
-    auto t0 = std::chrono::system_clock::now();
-    auto t1 = std::chrono::system_clock::now();
-    std::random_device device;
-    std::mt19937 generator(device());
-    std::normal_distribution<double> normal(0.0, 1.0);
+        std::random_device device;
+        std::mt19937 generator(device());
+        std::normal_distribution<double> normal(0.0, 1.0);
 
-    #pragma omp parallel for schedule(static)
-    for (size_t i = 0; i < nrep; i++)
-    {
-        for (size_t i = 0; i < n; i++) {
-            for (size_t j = 0; j < n; j++) {
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
                 p = i * n + j;
                 y[p] = normal(generator);
-                z[p] = normal(generator);
-            }
-        }
-        if (mode == 1) {
-            Eigen::MatrixXd X(n, n), Y(n, n), C(n, n);
-            int p = 0;
-            for (int i = 0; i < n; i++) {
-                for (int j = 0; j < n; j++) {
-                    p = i * n + j;
-                    X(i, j) = y[p];
-                    Y(i, j) = z[p];
-                    C(i, j) = 0;
-                }
-            }
-            t0 = std::chrono::system_clock::now();
-            C.noalias() = X * Y;
-            t1 = std::chrono::system_clock::now();
-        }
-        else {
-            t0 = std::chrono::system_clock::now();
-            cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, y, n, z, n, 0.0, x, n);
-            t1 = std::chrono::system_clock::now();
-        }
-        std::chrono::duration<double> elapsed = t1 - t0;
-        std::cout << "DGEMM elapsed time: " << elapsed.count() << "s\n";
-        t += static_cast<double>(elapsed.count());
-    }
-    std::cout << "DGEMM average time: " << t / nrep << "s\n";
-    ot << "DGEMM," << mode << "," << n << "," << t / nrep << "\n";
-    ot.close();
-}
-
-void F_GESV(double* const& v, double* const& y, double* const& b, const int& n, const int& nrep, const int& mode) {
-    std::ofstream ot;
-    ot.open("result.txt", std::ios_base::app);
-    double t = 0.0;
-    double* y1 = new double[n * n];
-    double* y2 = new double[n * n];
-    int p = 0, q = 0;
-    lapack_int ret = 0;
-    auto t0 = std::chrono::system_clock::now();
-    auto t1 = std::chrono::system_clock::now();
-    std::random_device device;
-    std::mt19937 generator(device());
-    std::normal_distribution<double> normal(0.0, 1.0);
-
-    #pragma omp parallel for schedule(static)
-    for (size_t i = 0; i < nrep; i++)
-    {
-        for (size_t i = 0; i < n; i++) {
-            for (size_t j = 0; j < n; j++) {
-                p = i * n + j;
-                q = j * n + i;
-                y1[p] = normal(generator);
-                y2[q] = y1[p];
+                yy[p] = 0.0;
             }
             b[i] = normal(generator);
+            x[i] = 0.0;
         }
-        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, y1, n, y2, n, 0.0, y, n);
 
-        if (mode == 1) {
-            Eigen::MatrixXd X(n, n);
-            Eigen::VectorXd C(n), Y(n);
-            int p = 0;
-            for (int i = 0; i < n; i++) {
-                for (int j = 0; j < n; j++) {
-                    p = i * n + j;
-                    X(i, j) = y[p];
-                }
-                Y(i) = b[i];
-                C(i) = 0;
-            }
-            t0 = std::chrono::system_clock::now();
-            C.noalias() = X.llt().solve(Y);
-            t1 = std::chrono::system_clock::now();
-        }
-        else {
-            int* ipiv = new int[n];
-            t0 = std::chrono::system_clock::now();
-            ret = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, 1, y, n, ipiv, b, 1);
-            t1 = std::chrono::system_clock::now();
-            delete[] ipiv;
-        }
-        std::chrono::duration<double> elapsed = t1 - t0;
-        std::cout << "DGESV elapsed time: " << elapsed.count() << "s\n";
-        t += static_cast<double>(elapsed.count());
+        Eigen::Map<Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, 1>>
+            Y(&y[0], n, n, Eigen::Stride<Eigen::Dynamic, 1>(n, 1));
+        Eigen::Map<Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, 1>>
+            YY(&yy[0], n, n, Eigen::Stride<Eigen::Dynamic, 1>(n, 1));
+        Eigen::Map<Eigen::VectorXd, 0, Eigen::InnerStride<1>> B(&b[0], n);
+        Eigen::Map<Eigen::VectorXd, 0, Eigen::InnerStride<1>> X(&x[0], n);
+        
+        YY.noalias() = Y * Y.transpose();
+        X.noalias() = YY * B;
+        
+        start_eigen = omp_get_wtime();
+        B.noalias() = YY.llt().solve(X);
+        end_eigen = omp_get_wtime();
+
+        #pragma omp critical
+        t_eigen += end_eigen - start_eigen;
+
+        delete[] yy;
+        delete[] y;
+        delete[] b;
+        delete[] x;
     }
-    std::cout << "DGESV average time: " << t / nrep << "s\n";
-    ot << "DGESV," << mode << "," << n << "," << t / nrep << "\n";
-    ot.close();
-    delete[] y1;
-    delete[] y2;
-}
 
-void F_POTRF(double* const& y, const int& n, const int& nrep, const int& mode) {
-    std::ofstream ot;
-    ot.open("result.txt", std::ios_base::app);
-    double t = 0.0;
-    int p = 0, q = 0;
-    lapack_int ret = 0;
-    double* y1 = new double[n * n];
-    double* y2 = new double[n * n];
-    auto t0 = std::chrono::system_clock::now();
-    auto t1 = std::chrono::system_clock::now();
-    std::random_device device;
-    std::mt19937 generator(device());
-    std::normal_distribution<double> normal(0.0, 1.0);
+    #pragma omp parallel for schedule(dynamic) firstprivate(start_openblas, end_openblas)
+    for (int i = 0; i < nrep; i++) {
 
-    #pragma omp parallel for schedule(static)
-    for (size_t i = 0; i < nrep; i++)
-    {
-        for (size_t i = 0; i < n; i++) {
-            for (size_t j = 0; j < n; j++) {
+        double* yy = new double[n*n];
+        double* y = new double[n*n];
+        double* b = new double[n];
+        double* x = new double[n];
+        int* ipiv = new int[n];
+
+        int p = 0;
+        
+        int id = omp_get_thread_num();
+        printf("ID: %d, #OpenBLAS Linear Solver\n", id);
+
+        std::random_device device;
+        std::mt19937 generator(device());
+        std::normal_distribution<double> normal(0.0, 1.0);
+
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
                 p = i * n + j;
-                q = j * n + i;
-                y1[p] = normal(generator);
-                y2[q] = y1[p];
+                y[p] = normal(generator);
+                yy[p] = 0.0;
             }
+            b[i] = normal(generator);
+            x[i] = 0.0;
         }
-        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, y1, n, y2, n, 0.0, y, n);
 
-        if (mode == 1) {
-            Eigen::MatrixXd X(n, n);
-            int p = 0;
-            for (int i = 0; i < n; i++) {
-                for (int j = 0; j < n; j++) {
-                    p = i * n + j;
-                    X(i, j) = y[p];
-                }
-            }
-            t0 = std::chrono::system_clock::now();
-            Eigen::MatrixXd T = X.llt().matrixL();
-            t1 = std::chrono::system_clock::now();
-        }
-        else {
-            int* ipiv = new int[n];
-            t0 = std::chrono::system_clock::now();
-            ret = LAPACKE_dpotrf(LAPACK_ROW_MAJOR, 'U', n, y, n);
-            t1 = std::chrono::system_clock::now();
-            delete[] ipiv;
-        }
-        std::chrono::duration<double> elapsed = t1 - t0;
-        std::cout << "DPOTRF elapsed time: " << elapsed.count() << "s\n";
-        t += static_cast<double>(elapsed.count());
-    }
-    std::cout << "DPOTRF average time: " << t / nrep << "s\n";
-    ot << "DPOTRF," << mode << "," << n << "," << t / nrep << "\n";
-    ot.close();
-    delete[] y1;
-    delete[] y2;
-}
+        Eigen::Map<Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, 1>>
+            Y(&y[0], n, n, Eigen::Stride<Eigen::Dynamic, 1>(n, 1));
+        Eigen::Map<Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, 1>>
+            YY(&yy[0], n, n, Eigen::Stride<Eigen::Dynamic, 1>(n, 1));
+        Eigen::Map<Eigen::VectorXd, 0, Eigen::InnerStride<1>> B(&b[0], n);
+        Eigen::Map<Eigen::VectorXd, 0, Eigen::InnerStride<1>> X(&x[0], n);
+        
+        YY.noalias() = Y * Y.transpose();
+        X.noalias() = YY * B;
+        
+        start_openblas = omp_get_wtime();
+        LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, 1, yy, n, ipiv, x, 1);
+        end_openblas = omp_get_wtime();
 
-void check(const int& n) {
-    double* x = new double[n * n];
-    double* y = new double[n * n];
-    double* z = new double[n * n];
-    double* y1 = new double[n * n];
-    double* y2 = new double[n * n];
-    double* y3 = new double[n * n];
-    double* a = new double[n];
-    double* b = new double[n];
-    int* ipiv = new int[n];
-    int p = 0, q = 0;
-    std::random_device device;
-    std::mt19937 generator(device());
-    std::normal_distribution<double> normal(0.0, 1.0);
-    double c1 = 0.0, c2 = 0.0, c3 = 0.0;
-    for (size_t i = 0; i < n; i++) {
-        for (size_t j = 0; j < n; j++) {
-            p = i * n + j;
-            q = j * n + i;
-            y1[p] = normal(generator);
-            y2[q] = y1[p];
-            z[p] = normal(generator);
-            z[q] = z[p];
-            x[p] = 0.0;
-            x[q] = 0.0;
-        }
-        a[i] = normal(generator);
-        b[i] = 0.0;
-    }
-    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, y1, n, y2, n, 0.0, y, n);
+        #pragma omp critical
+        t_openblas += end_openblas - start_openblas;
 
-    Eigen::MatrixXd X(n, n), Y(n, n), Z(n, n);
-    Eigen::VectorXd A(n), B(n);
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            p = i * n + j;
-            Y(i, j) = y[p];
-            Z(i, j) = z[p];
-            X(i, j) = 0.0;
-        }
-        A(i) = a[i];
-        B(i) = b[i];
+        delete[] yy;
+        delete[] y;
+        delete[] b;
+        delete[] x;
+        delete[] ipiv;
     }
 
-    // DGEMM
-    X.noalias() = Y * Z;
-    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, y, n, z, n, 0.0, x, n);
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            c1 = c1 + abs(x[i * n + j] - X(i, j));
-        }
-    }
+    printf("Eigen DGESV average time: %f\n", t_eigen/nrep);
+    printf("OpenBLAS DEGSV average time: %f\n", t_openblas/nrep);
 
-    // DGESV
-    B = Y * A;
-    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, n, 1, n, 1.0, y, n, a, 1, 0.0, b, 1);
-    
-    A = Y.llt().solve(B);
-    for (size_t i = 0; i < n; i++) {
-        for (size_t j = 0; j < n; j++) {
-            y3[i * n + j] = y[i * n + j];
-        }
-    }
-    LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, 1, y, n, ipiv, b, 1);
-
-    for (int i = 0; i < n; i++) {
-        c2 = c2 + abs(b[i] - A(i));
-    }
-
-    //DPOTRF
-    Eigen::MatrixXd T = Y.llt().matrixL();
-    LAPACKE_dpotrf(LAPACK_ROW_MAJOR, 'L', n, y3, n);
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < (i + 1); j++) {
-           c3 = c3 + abs(T(i, j) - y3[i * n + j]);
-        }
-    }
-    
-    std::cout << c1 << "," << c2 << "," << c3 << '\n';
-
-    delete[] x;
-    delete[] y;
-    delete[] z;
-    delete[] y1;
-    delete[] y2;
-    delete[] y3;
-    delete[] a;
-    delete[] b;
-    delete[] ipiv;
+    return 0;
 }
