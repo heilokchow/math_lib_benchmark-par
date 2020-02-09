@@ -1,0 +1,3 @@
+#dgesv produce incorrect answer when compiling the library using cmake with USE_OPENMP=1
+
+When I use OpenBLAS to do solve some high dimensional linear equations using LAPACKE_dgesv, I use cmake to compile the OpenBLAS library with -DUSE_OPENMP=1 since my program itself use OpenMP for parallelism. The computing process works fine without any warning or bugs. However, when I compare 
