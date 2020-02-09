@@ -1,3 +1,57 @@
 #dgesv produce incorrect answer when compiling the library using cmake with USE_OPENMP=1
 
-When I use OpenBLAS to do solve some high dimensional linear equations using LAPACKE_dgesv, I use cmake to compile the OpenBLAS library with -DUSE_OPENMP=1 since my program itself use OpenMP for parallelism. The computing process works fine without any warning or bugs. However, when I compare 
+When I use OpenBLAS to do solve some high dimensional linear equations using `LAPACKE_dgesv`, I use CMake to compile the OpenBLAS library `libopenblas.a` with `-DUSE_OPENMP=1` since my program itself use OpenMP for parallelism. My CMake build command is (unix system):
+```
+cmake -DUSE_OPENMP=1 <openblas directory with CMakeLists.txt>
+cmake --build <current binary directory>
+```
+The computing process doesn't generate any warning or bugs. First, I get vector b by b = A*x, then, I solve x by using dgesv function with parameter A and b. If I compare the original x and solved x, when dimension is low, it works fine with no error. However, when dimension is high, lets say n = 100, the solved x is inconsistent with original x and the error is very large. If I use `make USE_OPENMP=1` to recompile `libopenblas.a` and link my program with this library, the result of dgesv function is always correct. My testing code is shown below:
+```
+#include <stdio.h>
+#include <cblas.h>
+#include <lapacke.h>
+#include <random>
+#include <omp.h>
+
+int main ()
+{
+    int n = 1000;
+    int nrep = 20;
+    double sum_error = 0.0;
+
+    for (int k = 0; k < nrep; k++){
+        double* A = new double[n*n];
+        double* x = new double[n];
+        double* b = new double[n];
+        int* ipiv = new int[n];
+        double sum = 0;
+
+        std::random_device device;
+        std::mt19937 generator(device());
+        std::normal_distribution<double> normal(0.0, 1.0);
+
+        for (int i = 0; i < n*n; i++)
+            A[i] = normal(generator);
+
+        for (int i = 0; i < n; i++)
+            x[i] = normal(generator);
+
+        cblas_dgemv(CblasRowMajor, CblasNoTrans, n, n, 1.0, A, n, x, 1, 0.0, b, 1);
+        LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, 1, A, n, ipiv, b, 1);
+
+        for (int i = 0; i < n; i++)
+            sum += abs(b[i] - x[i]);
+        
+        sum_error += sum;
+
+        delete[] A;
+        delete[] x;
+        delete[] b;
+        delete[] ipiv;
+    }
+
+    printf("Error: %f\n", sum_error);
+
+    return 0;
+}
+```
