@@ -1,9 +1,9 @@
-#include <iostream>
-#include <chrono>
-#include <stdio.h>
 #define EIGEN_NO_DEBUG
 #define EIGEN_DONT_PARALLELIZE
 
+#include <iostream>
+#include <chrono>
+#include <stdio.h>
 #include <random>
 #include <string>
 #include <fstream>
@@ -148,7 +148,7 @@ int main(int argc, char** argv)
         end_eigen = omp_get_wtime();
 
         start_openblas = omp_get_wtime();
-//        LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, 1, yy, n, ipiv, x, 1);
+        LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, 1, yy, n, ipiv, x, 1);
         end_openblas = omp_get_wtime();
 
         for (int i = 0; i < n; i++)

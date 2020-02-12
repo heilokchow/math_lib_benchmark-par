@@ -1,7 +1,7 @@
 MKL_ROOT	= $(HOME)/intel/mkl
 OPENBLAS_ROOT	= $(HOME)/OpenBLAS
 LAPACK_ROOT 	= $(HOME)/.local/lapack
-EIGEN_DIR	= $(HOME)/Documents/external_package/EIGENDIR
+EIGEN_DIR	= $(HOME)/Eigen
 
 INCLUDE_DIR = -I$(EIGEN_DIR)
 
@@ -14,7 +14,7 @@ INCLUDE_DIR +=
 endif
 
 ifeq ($(MKL), 1)
-LIB_DIR =  -Wl,--start-group $(MKL_ROOT)/lib/intel64/libmkl_intel_ilp64.a $(MKL_ROOT)/lib/intel64/libmkl_gnu_thread.a $(MKL_ROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -fopenmp -lm -ldl
+LIB_DIR =  -Wl,--start-group $(MKL_ROOT)/lib/intel64/libmkl_intel_lp64.a $(MKL_ROOT)/lib/intel64/libmkl_gnu_thread.a $(MKL_ROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -fopenmp -lm -ldl
 else ifeq ($(OPENBLAS), 1)
 LIB_DIR = -L$(OPENBLAS_ROOT)/lib -l:libopenblas.a -fopenmp
 else
