@@ -8,6 +8,14 @@ find_package(Eigen3 REQUIRED)
 find_package(OpenBLAS REQUIRED)
 find_package(OpenMP REQUIRED)
 
+list(APPEND CMAKE_PREFIX_PATH "/home/heilokchow/intel")
+message("CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
+
+set(BLA_VENDOR Intel10_64lp)
+find_package(LAPACK)
+
+message("LAPACK_LIBRARIES: ${LAPACK_LIBRARIES}")
+
 add_executable(benchmark bench.cpp)
 
 target_compile_options(benchmark

@@ -1,18 +1,22 @@
 #include <iostream>
 #include <chrono>
 #include <stdio.h>
+#define EIGEN_NO_DEBUG
+#define EIGEN_DONT_PARALLELIZE
+
 #include <random>
 #include <string>
 #include <fstream>
 #include <memory>
 #include <Eigen/Dense>
+#include <omp.h>
+
+#ifdef USE_MKL
+#include <mkl.h>
+#else
 #include <cblas.h>
 #include <lapacke.h>
-#include <omp.h>
-#include "benchConfig.h"
-
-#define EIGEN_NO_DEBUG
-#define EIGEN_DONT_PARALLELIZE
+#endif
 
 void check(const int&);
 
@@ -40,7 +44,11 @@ int main(int argc, char** argv)
     out.open("result.txt", std::ios_base::app);
 
     omp_set_num_threads(num_threads);
-    
+
+#ifdef USE_MKL
+    mkl_set_num_threads(1);
+#endif
+
     // Perform Martix Multiplication
     
     #pragma omp parallel for schedule(dynamic) shared(t_eigen, t_openblas) \
@@ -140,7 +148,7 @@ int main(int argc, char** argv)
         end_eigen = omp_get_wtime();
 
         start_openblas = omp_get_wtime();
-        LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, 1, yy, n, ipiv, x, 1);
+//        LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, 1, yy, n, ipiv, x, 1);
         end_openblas = omp_get_wtime();
 
         for (int i = 0; i < n; i++)
