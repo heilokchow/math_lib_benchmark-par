@@ -15,7 +15,7 @@ INCLUDE_DIR +=
 endif
 
 ifeq ($(MKL), 1)
-LIB_DIR = -DUSE_MKL -Wl,--start-group $(MKL_ROOT)/lib/intel64/libmkl_intel_lp64.a $(MKL_ROOT)/lib/intel64/libmkl_gnu_thread.a $(MKL_ROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -fopenmp -lm -ldl
+LIB_DIR = -DUSE_MKL -DUSE_NESTED -Wl,--start-group $(MKL_ROOT)/lib/intel64/libmkl_intel_lp64.a $(MKL_ROOT)/lib/intel64/libmkl_gnu_thread.a $(MKL_ROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -fopenmp -lm -ldl
 else ifeq ($(OPENBLAS), 1)
 LIB_DIR = -L$(OPENBLAS_ROOT)/lib -l:libopenblas.a -fopenmp
 else

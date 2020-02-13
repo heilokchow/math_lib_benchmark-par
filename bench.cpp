@@ -46,7 +46,11 @@ int main(int argc, char** argv)
     omp_set_num_threads(num_threads);
 
 #ifdef USE_MKL
-    mkl_set_num_threads(1);
+#ifdef USE_NESTED
+    omp_set_nested(1);
+    printf("Whether nested is allowed: %d\n", omp_get_nested());
+    int k = omp_get_num_procs() / num_threads;
+#endif
 #endif
 
     // Perform Martix Multiplication
@@ -54,6 +58,12 @@ int main(int argc, char** argv)
     #pragma omp parallel for schedule(dynamic) shared(t_eigen, t_openblas) \
             firstprivate(sum, start_eigen, end_eigen, start_openblas, end_openblas)
     for (int i = 0; i < nrep; i++) {
+
+#ifdef USE_MKL
+#ifdef USE_NESTED
+        mkl_set_num_threads_local(k);
+#endif
+#endif
 
         double* x1 = new double[n*n];
         double* x2 = new double[n*n];
@@ -115,6 +125,12 @@ int main(int argc, char** argv)
     #pragma omp parallel for schedule(dynamic) shared(t_eigen, t_openblas) \
             firstprivate(sum, start_eigen, end_eigen, start_openblas, end_openblas)
     for (int i = 0; i < nrep; i++) {
+
+#ifdef USE_MKL
+#ifdef USE_NESTED
+        mkl_set_num_threads_local(k);
+#endif
+#endif
 
         double* yy = new double[n*n];
         double* y = new double[n*n];
