@@ -4,7 +4,7 @@ parallel version of math_lib_benchmark
 
 ## Benchmark on multithreading performance
 
-![Imgur](https://i.imgur.com/BC7BPpr.png?2)
+![Imgur](https://i.imgur.com/Hz8xXZb.png?2)
 
 ## Potential bugs
 
