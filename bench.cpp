@@ -87,24 +87,26 @@ int main(int argc, char** argv)
         Eigen::Map<Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, 1>>
             Z(&z[0], n, n, Eigen::Stride<Eigen::Dynamic, 1>(n, 1));
 
+#ifdef TEST_EIGEN
         start_eigen = omp_get_wtime();
         X1.noalias() = Y * Z;
         end_eigen = omp_get_wtime();
-
+#else
         start_openblas = omp_get_wtime();
         cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, y, n, z, n, 0.0, x2, n);
         end_openblas = omp_get_wtime();
-
-        for (int i = 0; i < n*n; i++)
-            sum += abs(x1[i] - x2[i]);
+#endif
 
         int id = omp_get_thread_num();
         printf("ID: %d, Error: %f #Matrix Multiplication\n", id, sum);
 
         #pragma omp critical
         {
+#ifdef TEST_EIGEN
             t_eigen += end_eigen - start_eigen;
+#else
             t_openblas += end_openblas - start_openblas;
+#endif
         }
 
         delete[] x1;
@@ -113,8 +115,11 @@ int main(int argc, char** argv)
         delete[] z;
     }
 
+#ifdef TEST_EIGEN
     out << "DGEMM, Eigen, " << n << ", " << t_eigen / nrep << "\n";
+#else
     out << "DGEMM, OBLAS, " << n << ", " << t_openblas / nrep << "\n";
+#endif
 
     // Perform Matrix Inversion
     
@@ -156,27 +161,29 @@ int main(int argc, char** argv)
         Eigen::Map<Eigen::VectorXd, 0, Eigen::InnerStride<1>> X(&x[0], n);
         
         YY.noalias() = Y * Y.transpose();
-        Eigen::MatrixXd YY_copy(YY);
         X.noalias() = YY * B;
 
+#ifdef TEST_EIGEN
+        Eigen::MatrixXd YY_copy(YY);
         start_eigen = omp_get_wtime();
         B.noalias() = YY_copy.llt().solve(X);
         end_eigen = omp_get_wtime();
-
+#else
         start_openblas = omp_get_wtime();
         LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, 1, yy, n, ipiv, x, 1);
         end_openblas = omp_get_wtime();
-
-        for (int i = 0; i < n; i++)
-            sum += abs(x[i] - b[i]);
+#endif
 
         int id = omp_get_thread_num();
         printf("ID: %d, Error: %f #Linear Solver\n", id, sum);
 
         #pragma omp critical
         {
+#ifdef TEST_EIGEN
             t_eigen += end_eigen - start_eigen;
+#else
             t_openblas += end_openblas - start_openblas;
+#endif
         }
 
         delete[] yy;
@@ -186,8 +193,11 @@ int main(int argc, char** argv)
         delete[] ipiv;
     }
 
+#ifdef TEST_EIGEN
     out << "DGESV, Eigen, " << n << ", " << t_eigen / nrep << "\n";
+#else
     out << "DGESV, OBLAS, " << n << ", " << t_openblas / nrep << "\n";
+#endif
     out.close();
 
     return 0;
