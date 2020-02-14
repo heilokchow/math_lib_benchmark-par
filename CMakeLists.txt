@@ -34,3 +34,10 @@ set(THREAD 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
 foreach(X IN LISTS THREAD)
 	do_test(benchmark 2000 100 "${X}")
 endforeach()
+
+# Singlethread performance testing
+set(DIMENSION 50 75 100 150 250 400 600 850 1300 2000 3000 4500 6500 10000)
+foreach(X IN LISTS DIMENSION)
+	do_test(benchmark "${X}" 10 1)
+endforeach()
+
