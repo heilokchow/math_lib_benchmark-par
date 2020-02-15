@@ -4,11 +4,11 @@ parallel version of math_lib_benchmark
 
 ## Benchmark
 
-![Imgur](https://i.imgur.com/Hz8xXZb.png?2)
+![Imgur](https://i.imgur.com/WGSUEG5.png?2)
 
-![Imgur](https://i.imgur.com/cDj6FlG.png?1)
+![Imgur](https://i.imgur.com/PE9cALk.png?1)
 
-`llt()` function is used for Eigen's linear solver since positve definite matrix is considered here. That's why Eigen is fast here. General matrix's performance will be tested later.
+`llt()` function solves positve definite matrix is considered here which is faster. 
 
 ## Potential bugs
 
