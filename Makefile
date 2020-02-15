@@ -11,6 +11,10 @@ ifeq ($(EIGEN), 1)
 COMPILE_DEF += -DTEST_EIGEN
 endif
 
+ifeq ($(POSITIVE_DEF), 1)
+COMPILE_DEF += -DPOSITIVE_DEFINITE
+endif
+
 ifeq ($(MKL), 1)
 INCLUDE_DIR += -I$(MKL_ROOT)/include
 COMPILE_DEF += -DUSE_MKL

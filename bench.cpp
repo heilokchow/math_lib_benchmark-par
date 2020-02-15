@@ -158,13 +158,21 @@ int main(int argc, char** argv)
         Eigen::Map<Eigen::VectorXd, 0, Eigen::InnerStride<1>> B(&b[0], n);
         Eigen::Map<Eigen::VectorXd, 0, Eigen::InnerStride<1>> X(&x[0], n);
         
+#ifdef POSITIVE_DEFINITE
         YY.noalias() = Y * Y.transpose();
+#else
+        YY = Y;
+#endif
         X.noalias() = YY * B;
 
 #ifdef TEST_EIGEN
         Eigen::MatrixXd YY_copy(YY);
         start_eigen = omp_get_wtime();
+#ifdef POSITIVE_DEFINITE
         B.noalias() = YY_copy.llt().solve(X);
+#else
+        B.noalias() = YY_copy.partialPivLu().solve(X);
+#endif
         end_eigen = omp_get_wtime();
 #else
         start_openblas = omp_get_wtime();
