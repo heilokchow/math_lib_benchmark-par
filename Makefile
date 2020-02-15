@@ -2,10 +2,14 @@ MKL_ROOT	= $(HOME)/intel/mkl
 OPENBLAS_ROOT	= $(HOME)/OpenBLAS
 LAPACK_ROOT 	= $(HOME)/.local/lapack
 EIGEN_DIR	= $(HOME)/Eigen
-CCFLAG	= -O2 -mfma
+CCFLAG		= -O3 -march=native
 COMPILE_DEF	= 
 
 INCLUDE_DIR = -I$(EIGEN_DIR)
+
+ifeq ($(EIGEN), 1)
+COMPILE_DEF += -DTEST_EIGEN
+endif
 
 ifeq ($(MKL), 1)
 INCLUDE_DIR += -I$(MKL_ROOT)/include

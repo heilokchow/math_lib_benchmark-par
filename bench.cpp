@@ -18,8 +18,6 @@
 #include <lapacke.h>
 #endif
 
-void check(const int&);
-
 int main(int argc, char** argv)
 {
     if (argc < 4) {
